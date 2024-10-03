@@ -1,4 +1,15 @@
+import "./App.css";
 import React, { useState, useEffect } from "react";
+
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "./comonents/command";
 
 const COMMANDS: { name: string; action: () => void }[] = [
   { name: "New Tab", action: () => chrome.tabs.create({}) },
@@ -45,19 +56,33 @@ const CommandPalette: React.FC = () => {
   const [historySuggestions, setHistorySuggestions] = useState<
     { title: string; url: string }[]
   >([]);
+  const [activeTabs, setActiveTabs] = useState<
+    { title: string; url: string; favIconUrl?: string }[]
+  >([]);
 
   useEffect(() => {
+    // Fetch all active tabs
+    chrome.tabs.query({}, (tabs) => {
+      const tabList = tabs.map((tab) => ({
+        title: tab.title!,
+        url: tab.url!,
+        favIconUrl: tab.favIconUrl,
+      }));
+      setActiveTabs(tabList);
+    });
+
+    // Filter commands based on query
     const filtered = COMMANDS.filter((command) =>
       command.name.toLowerCase().includes(query.toLowerCase())
     );
     setFilteredCommands(filtered);
 
-    // Fetch history suggestions
+    // Fetch history suggestions if no command matches
     if (query && !filtered.length) {
       chrome.history.search({ text: query, maxResults: 5 }, (results) => {
         const validResults = results
-          .filter((item) => item.title && item.url) // Ensure title and url are defined
-          .map((item) => ({ title: item.title!, url: item.url! })); // Use non-null assertion
+          .filter((item) => item.title && item.url)
+          .map((item) => ({ title: item.title!, url: item.url! }));
         setHistorySuggestions(validResults);
       });
     } else {
@@ -67,82 +92,82 @@ const CommandPalette: React.FC = () => {
 
   const handleSuggestionClick = (url: string) => {
     chrome.tabs.create({ url });
-    setQuery(""); // Clear the input
+    setQuery("");
   };
 
   const handleCommandClick = (action: () => void) => {
     action();
-    setQuery(""); // Clear the input
+    setQuery("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (filteredCommands.length === 0 && historySuggestions.length === 0) {
-        // Open a new tab with the search query if no matches
         chrome.tabs.create({
           url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
         });
-        setQuery(""); // Clear the input
+        setQuery("");
       }
     }
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: "#1a1a1a",
-        padding: "16px",
-        width: "384px",
-        margin: "auto",
-        borderRadius: "8px",
-      }}
-    >
-      <input
-        type="text"
-        style={{
-          width: "100%",
-          padding: "8px",
-          color: "#fff",
-          backgroundColor: "#333",
-          borderRadius: "4px",
-        }}
-        placeholder="Type a command or search..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <ul style={{ marginTop: "16px", listStyleType: "none", padding: 0 }}>
-        {filteredCommands.map((command, idx) => (
-          <li
-            key={idx}
-            style={{ padding: "8px", color: "#fff", cursor: "pointer" }}
-            onClick={() => handleCommandClick(command.action)}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#444")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            {command.name}
-          </li>
-        ))}
-        {historySuggestions.map((suggestion, idx) => (
-          <li
-            key={idx}
-            style={{ padding: "8px", color: "#fff", cursor: "pointer" }}
-            onClick={() => handleSuggestionClick(suggestion.url)}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#444")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            {suggestion.title}
-          </li>
-        ))}
-      </ul>
+    <div className="w-[500px] min-h-[400px] !bg-transparent flex justify-start items-start">
+      <CommandDialog open={true}>
+        <CommandInput
+          placeholder="Type a command or search..."
+          onValueChange={(e) => setQuery(e)}
+          onKeyDown={(e) => handleKeyDown(e)}
+        />
+        <CommandList>
+          <CommandEmpty>Press Enter to search</CommandEmpty>
+
+          {/* Active Tabs Section */}
+          <CommandGroup heading="Active Tabs">
+            {activeTabs.map((tab, idx) => (
+              <CommandItem
+                key={idx}
+                onSelect={() => handleSuggestionClick(tab.url)}
+              >
+                <img
+                  src={tab.favIconUrl}
+                  alt="Tab Icon"
+                  className="inline-block w-4 h-4 mr-2"
+                />
+                {tab.title}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+
+          <CommandSeparator />
+
+          {/* Commands Section */}
+          <CommandGroup heading="Commands">
+            {filteredCommands.map((command, idx) => (
+              <CommandItem
+                key={idx}
+                onSelect={() => handleCommandClick(command.action)}
+              >
+                {command.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+
+          <CommandSeparator />
+
+          {/* History Suggestions Section */}
+          <CommandGroup heading="History Suggestions">
+            {historySuggestions.map((suggestion, idx) => (
+              <CommandItem
+                key={idx}
+                onClick={() => handleSuggestionClick(suggestion.url)}
+              >
+                {suggestion.title}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
     </div>
   );
 };
