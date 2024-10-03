@@ -150,7 +150,7 @@ const CommandPalette: React.FC = () => {
 
           // Create a unique set of history suggestions based on URL
           const uniqueHistory = Array.from(
-            new Map(validResults.map((item) => [item.url, item])).values()
+            new Map(validResults.map((item) => [item.title, item])).values()
           );
           setHistorySuggestions(uniqueHistory);
         });
@@ -163,7 +163,7 @@ const CommandPalette: React.FC = () => {
 
           // Create a unique set of history suggestions based on URL
           const uniqueHistory = Array.from(
-            new Map(validResults.map((item) => [item.url, item])).values()
+            new Map(validResults.map((item) => [item.title, item])).values()
           );
           setHistorySuggestions(uniqueHistory);
         });
