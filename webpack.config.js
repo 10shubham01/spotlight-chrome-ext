@@ -34,7 +34,7 @@ module.exports = {
   },
   plugins: [
     new CopyPlugin({
-      patterns: [ { from: "manifest.json", to: "../manifest.json" },{ from: "background.js", to: "../background.js" },{ from: "content-script/index.js", to: "../content-script/index.js" } ],
+      patterns: [ { from: "manifest.json", to: "../manifest.json" },{ from: "background.js", to: "../background.js" },{ from: "ext.jpeg", to: "../ext.jpeg" } ],
     }),
     ...getHtmlPlugins(["index"]),
   ],
