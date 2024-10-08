@@ -9,44 +9,46 @@ import {
   CommandList,
   CommandSeparator,
 } from "./comonents/command";
+import { BookmarkIcon, GlobeIcon } from "@radix-ui/react-icons";
 
-import { BookmarkIcon, GlobeIcon } from "@radix-ui/react-icons"; // Importing icons
+// Defining types for chrome API interactions
+interface Tab {
+  title: string;
+  url: string;
+  favIconUrl?: string;
+  windowId: number;
+}
+
+interface Bookmark {
+  title: string;
+  url: string;
+  favIconUrl?: string;
+}
+
+interface HistorySuggestion {
+  title: string;
+  url: string;
+}
 
 const CommandPalette: React.FC = () => {
   const [query, setQuery] = useState<string>("");
   const [historySuggestions, setHistorySuggestions] = useState<
-    { title: string; url: string }[]
+    HistorySuggestion[]
   >([]);
-  const [activeTabs, setActiveTabs] = useState<
-    { title: string; url: string; favIconUrl?: string; windowId: number }[]
-  >([]);
-
-  const [recentlyClosedTabs, setRecentlyClosedTabs] = useState<
-    { title: string; url: string; favIconUrl?: string }[]
-  >([]);
+  const [activeTabs, setActiveTabs] = useState<Tab[]>([]);
+  const [recentlyClosedTabs, setRecentlyClosedTabs] = useState<Tab[]>([]);
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
-  const [bookmarks, setBookmarks] = useState<
-    { title: string; url: string; favIconUrl?: string }[]
-  >([]);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
 
-  // Fetch favicon for a given URL
-  const getFavicon = (url: string) => {
-    return `https://www.google.com/s2/favicons?domain=${
-      new URL(url).hostname
-    }&sz=64`; // Google favicon service
-  };
+  const getFavicon = (url: string) =>
+    `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`;
 
-  // Function to fetch all bookmarks
   const fetchBookmarks = () => {
     chrome.bookmarks.getTree((bookmarkTreeNodes) => {
       const extractBookmarks = (
         nodes: chrome.bookmarks.BookmarkTreeNode[]
-      ): { title: string; url: string; favIconUrl?: string }[] => {
-        let bookmarksList: {
-          title: string;
-          url: string;
-          favIconUrl?: string;
-        }[] = [];
+      ): Bookmark[] => {
+        let bookmarksList: Bookmark[] = [];
         nodes.forEach((node) => {
           if (node.url) {
             bookmarksList.push({
@@ -64,39 +66,29 @@ const CommandPalette: React.FC = () => {
         return bookmarksList;
       };
 
-      const allBookmarks = extractBookmarks(bookmarkTreeNodes);
-      setBookmarks(allBookmarks);
+      setBookmarks(extractBookmarks(bookmarkTreeNodes));
     });
   };
 
-  // Function to fetch active tabs and split by windows
-  const fetchActiveTabs = async (): Promise<
-    { title: string; url: string; favIconUrl?: string; windowId: number }[]
-  > => {
+  const fetchActiveTabs = async (): Promise<Tab[]> => {
     return new Promise((resolve) => {
       chrome.windows.getCurrent({ populate: true }, (currentWindow) => {
-        setCurrentWindowId(currentWindow.id as number); // Store current window ID
-
+        setCurrentWindowId(currentWindow?.id ?? null);
         chrome.tabs.query({}, (tabs) => {
-          const currentWindowTabs = tabs.filter(
-            (tab) => tab.windowId === currentWindow.id
-          );
-          const allTabs = [
-            ...currentWindowTabs.map((tab) => ({
-              title: tab.title!,
-              url: tab.url!,
+          const allTabs = tabs
+            .filter((tab) => tab.windowId === currentWindow?.id)
+            .map((tab) => ({
+              title: tab.title ?? "No title",
+              url: tab.url ?? "No URL",
               favIconUrl: tab.favIconUrl,
               windowId: tab.windowId,
-            })),
-          ];
-
+            }));
           resolve(allTabs);
         });
       });
     });
   };
 
-  // Fetch recently closed tabs
   const fetchRecentlyClosedTabs = () => {
     chrome.sessions.getRecentlyClosed((sessions) => {
       const closedTabs = sessions
@@ -104,9 +96,10 @@ const CommandPalette: React.FC = () => {
         .map((session) => {
           const tab = session.tab!;
           return {
-            title: tab.title!,
-            url: tab.url!,
+            title: tab.title ?? "No title",
+            url: tab.url ?? "No URL",
             favIconUrl: tab.favIconUrl,
+            windowId: -1, // Closed tabs don’t have a windowId
           };
         });
       setRecentlyClosedTabs(closedTabs);
@@ -117,45 +110,35 @@ const CommandPalette: React.FC = () => {
     const updateTabsAndCommands = async () => {
       const tabs = await fetchActiveTabs();
       const uniqueTabs = Array.from(
-        new Map(tabs.map((tab) => [tab.title, tab])).values()
+        new Map(tabs.map((tab) => [tab.url, tab])).values()
       );
       setActiveTabs(uniqueTabs);
 
-      // Fetch history suggestions based on query
       if (query) {
         chrome.history.search({ text: query, maxResults: 1000 }, (results) => {
-          const validResults = results
-            .filter((item) => item.title && item.url)
-            .map((item) => ({
-              title: item.title!,
-              url: item.url!,
-            }));
-
           const uniqueHistory = Array.from(
-            new Map(validResults.map((item) => [item.title, item])).values()
+            new Map(
+              results
+                .filter((item) => item.title && item.url)
+                .map((item) => [item.title, item])
+            ).values()
           );
-          setHistorySuggestions(uniqueHistory);
+          setHistorySuggestions(uniqueHistory as HistorySuggestion[]);
         });
       } else {
         chrome.history.search({ text: "", maxResults: 5 }, (results) => {
-          const validResults = results
-            .filter((item) => item.title && item.url)
-            .map((item) => ({
-              title: item.title!,
-              url: item.url!,
-            }));
-
           const uniqueHistory = Array.from(
-            new Map(validResults.map((item) => [item.title, item])).values()
+            new Map(
+              results
+                .filter((item) => item.title && item.url)
+                .map((item) => [item.title, item])
+            ).values()
           );
-          setHistorySuggestions(uniqueHistory);
+          setHistorySuggestions(uniqueHistory as HistorySuggestion[]);
         });
       }
 
-      // Fetch bookmarks
       fetchBookmarks();
-
-      // Fetch recently closed tabs
       fetchRecentlyClosedTabs();
     };
 
@@ -167,7 +150,6 @@ const CommandPalette: React.FC = () => {
       const matchingTab = tabs.find((tab) => tab.url === url);
       if (matchingTab) {
         chrome.tabs.update(matchingTab.id!, { active: true });
-        // Update recent tabs
       } else {
         chrome.tabs.create({ url });
       }
@@ -175,13 +157,11 @@ const CommandPalette: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      if (historySuggestions.length === 0) {
-        chrome.tabs.create({
-          url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-        });
-        setQuery("");
-      }
+    if (e.key === "Enter" && historySuggestions.length === 0) {
+      chrome.tabs.create({
+        url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+      });
+      setQuery("");
     }
   };
 
@@ -190,7 +170,7 @@ const CommandPalette: React.FC = () => {
       <CommandDialog open={true}>
         <CommandInput
           placeholder="Spotlight Search"
-          onValueChange={(e) => setQuery(e)}
+          onValueChange={setQuery}
           onKeyDown={handleKeyDown}
         />
         <CommandList>
@@ -198,7 +178,6 @@ const CommandPalette: React.FC = () => {
             Hit Enter <kbd>↵</kbd> to search on Google.
           </CommandEmpty>
 
-          {/* Active Tabs Section for Current Window */}
           <CommandGroup heading="Current Window Tabs">
             {activeTabs
               .filter((tab) => tab.windowId === currentWindowId)
@@ -223,7 +202,6 @@ const CommandPalette: React.FC = () => {
           </CommandGroup>
           <CommandSeparator />
 
-          {/* Recently Closed Tabs Section */}
           <CommandGroup heading="Recently Closed Tabs">
             {recentlyClosedTabs.map((tab) => (
               <CommandItem
@@ -245,7 +223,6 @@ const CommandPalette: React.FC = () => {
           </CommandGroup>
           <CommandSeparator />
 
-          {/* Bookmarks Section */}
           <CommandGroup heading="Bookmarks">
             {bookmarks.map((bookmark) => (
               <CommandItem
@@ -267,7 +244,6 @@ const CommandPalette: React.FC = () => {
           </CommandGroup>
           <CommandSeparator />
 
-          {/* History Suggestions Section */}
           <CommandGroup heading="History Suggestions">
             {historySuggestions.map((suggestion) => (
               <CommandItem

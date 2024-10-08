@@ -29,9 +29,9 @@
     }
   },
   "icons": {
-    "16": "ext.jpeg",
-    "24": "ext.jpeg",
-    "32": "ext.jpeg",
-    "128":"ext.jpeg"
+    "16": "ext.png",
+    "24": "ext.png",
+    "32": "ext.png",
+    "128":"ext.png"
   }
 }
